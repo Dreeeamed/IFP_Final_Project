@@ -70,4 +70,16 @@ public class WordleEvaluatorTests
         Assert.Equal(states.ToArray(), pattern.ToStates(5).ToArray());
         Assert.Equal(FeedbackPattern.From(Pattern("GGGGG")), FeedbackPattern.From(WordleEvaluator.Evaluate("CRANE", "CRANE")));
     }
+
+    [Theory]
+    // BOBBY vs BOOBY: first B is exact, O is exact, second B in guess matches last B in secret.
+    [InlineData("BOBBY", "BOOBY", "GG.GG")]
+    // SHEEP vs GEESE: middle E is exact, first E is yellow, third E is absent (only 2 E's in SHEEP).
+    [InlineData("SHEEP", "GEESE", ".YGY.")]
+    // TITAN vs TRAIN: T and N are exact; both A and I are transposed.
+    [InlineData("TITAN", "TRAIN", "G.YYG")]
+    // LEVEL vs EERIE: exact E at index 1 consumes one copy; first E takes the other; third E is absent.
+    [InlineData("LEVEL", "EERIE", "YG...")]
+    public void Extra_repeated_letter_edge_cases(string secret, string guess, string expected) =>
+        Assert.Equal(expected, Marks(WordleEvaluator.Evaluate(secret, guess)));
 }
