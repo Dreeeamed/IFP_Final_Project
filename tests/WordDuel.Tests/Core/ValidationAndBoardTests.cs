@@ -119,4 +119,20 @@ public class PlayerBoardTests
         Assert.Equal(LetterState.Absent, keys['T']);
         Assert.False(keys.ContainsKey('Z'));
     }
+
+    [Fact]
+    public void Empty_board_has_expected_initial_metrics()
+    {
+        var board = PlayerBoard.Empty();
+        Assert.Equal(6, board.AttemptsLeft);
+        Assert.Empty(board.Guesses);
+        Assert.False(board.IsFinished);
+        Assert.Empty(KeyboardState.From(board.Guesses));
+    }
+
+    [Fact]
+    public void Normalization_pipeline_is_idempotent()
+    {
+        Assert.Equal(GuessValidator.Normalize("crane"), GuessValidator.Normalize(GuessValidator.Normalize("  crane  ")));
+    }
 }
