@@ -8,6 +8,8 @@ During a round you only see your opponent's *attempt count* and whether they hav
 or colours (**Blind Duel**). When both are done, the word and both boards are revealed, followed by an
 explainable **Strategy Analyzer** that shows how many candidate answers each guess eliminated.
 
+> Final Project for *Functional Programming in C#* by **Ardak Kazykhan** and **Bolatbek Bolat** (Group IT-2510).
+
 
 ---
 
@@ -122,9 +124,7 @@ Results from our machine and their interpretation: [docs/PERFORMANCE.md](docs/PE
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | functional core / imperative shell, domain model, state machine, SignalR flow, diagrams |
 | [FUNCTIONAL_PROGRAMMING.md](FUNCTIONAL_PROGRAMMING.md) | lecture → concept → exact file/function → student |
-| [CONTRIBUTIONS.md](CONTRIBUTIONS.md) | planned split, shared parts, work-log template, Git workflow |
 | [TESTING.md](TESTING.md) | automated tests, manual checklist, edge cases |
-| [DEFENSE_GUIDE.md](DEFENSE_GUIDE.md) | speaking plan, demo script, likely questions and answers |
 | [RUBRIC_CHECKLIST.md](RUBRIC_CHECKLIST.md) | all 20 grading criteria with evidence and limitations |
 | [docs/PRESENTATION_OUTLINE.md](docs/PRESENTATION_OUTLINE.md) | slide-by-slide outline |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | requirements analysis, week mapping assumption, risks |

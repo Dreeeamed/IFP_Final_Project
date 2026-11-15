@@ -6,6 +6,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
     <Deterministic>true</Deterministic>
-    <Authors>Word Duel team (Student A, Student B)</Authors>
+    <Authors>Ardak Kazykhan, Bolatbek Bolat</Authors>
   </PropertyGroup>
 </Project>
