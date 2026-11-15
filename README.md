@@ -8,7 +8,7 @@ During a round you only see your opponent's *attempt count* and whether they hav
 or colours (**Blind Duel**). When both are done, the word and both boards are revealed, followed by an
 explainable **Strategy Analyzer** that shows how many candidate answers each guess eliminated.
 
-> University final project — Student A & Student B. See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for the work split.
+> Ardak and Bolatbek worked here: See [CONTRIBUTIONS.md](CONTRIBUTIONS.md) for the work split.
 
 ---
 
