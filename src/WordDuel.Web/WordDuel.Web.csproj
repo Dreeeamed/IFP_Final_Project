@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- ASP.NET Core host: SignalR hub, background round timer, HTTP endpoints and the Blazor WebAssembly client. -->
+  <PropertyGroup>
+    <RootNamespace>WordDuel.Web</RootNamespace>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WordDuel.Web.Client\WordDuel.Web.Client.csproj" />
+    <ProjectReference Include="..\WordDuel.Infrastructure\WordDuel.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.15" />
+  </ItemGroup>
+
+</Project>

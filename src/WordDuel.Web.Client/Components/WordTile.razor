@@ -1,0 +1,45 @@
+@* One letter tile. Purely presentational: everything arrives through parameters. *@
+<div class="@CssClass" style="--i:@Index" role="img" aria-label="@AriaLabel">@(Letter?.ToString())</div>
+
+@code {
+    [Parameter] public char? Letter { get; set; }
+
+    [Parameter] public LetterState? State { get; set; }
+
+    /// <summary>Position in the row; staggers the flip animation.</summary>
+    [Parameter] public int Index { get; set; }
+
+    /// <summary>Play the flip-reveal animation (only for the row that was just submitted).</summary>
+    [Parameter] public bool Animate { get; set; }
+
+    [Parameter] public bool Small { get; set; }
+
+    private string CssClass => string.Join(' ', new[]
+    {
+        "tile",
+        Small ? "tile--small" : null,
+        Letter is null ? null : "tile--filled",
+        State switch
+        {
+            LetterState.Correct => "tile--correct",
+            LetterState.Present => "tile--present",
+            LetterState.Absent => "tile--absent",
+            _ => null
+        },
+        Animate && State is not null ? "tile--reveal" : null
+    }.Where(css => css is not null));
+
+    private string AriaLabel => (Letter, State) switch
+    {
+        (null, _) => "empty",
+        ({ } letter, null) => letter.ToString(),
+        ({ } letter, { } state) => $"{letter}, {Describe(state)}"
+    };
+
+    private static string Describe(LetterState state) => state switch
+    {
+        LetterState.Correct => "correct position",
+        LetterState.Present => "in the word, wrong position",
+        _ => "not in the word"
+    };
+}

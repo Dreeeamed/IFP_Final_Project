@@ -1,0 +1,160 @@
+﻿@page "/"
+@page "/join/{Code}"
+@inject DuelConnection Duel
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+
+<PageTitle>Word Duel — Blind Arena</PageTitle>
+
+<section class="hero">
+    <div class="hero__tiles" aria-hidden="true">
+        @for (var i = 0; i < 4; i++)
+        {
+            <WordTile Letter="@("WORD"[i])" State="HeroStates[i]" Index="i" Animate="true" />
+        }
+        <span class="hero__gap"></span>
+        @for (var i = 0; i < 4; i++)
+        {
+            <WordTile Letter="@("DUEL"[i])" State="HeroStates[3 - i]" Index="i + 4" Animate="true" />
+        }
+    </div>
+    <h1>Word Duel <span class="accent">Blind Arena</span></h1>
+    <p class="hero__lead">Race a friend to the same secret five-letter word. Separate boards, real-time scores — and you can't see their guesses until the round is over.</p>
+</section>
+
+<section class="lobby-grid">
+    <div class="card play-card">
+        <label class="field">
+            <span>Your nickname</span>
+            <input @bind="_nickname" @bind:event="oninput" maxlength="@Nickname.MaxLength" placeholder="e.g. Aigerim" autocomplete="nickname" aria-describedby="nick-help" />
+            <small id="nick-help" class="muted">1–16 letters, digits, spaces, - or _</small>
+        </label>
+
+        <div class="tabs" role="tablist">
+            <button type="button" role="tab" aria-selected="@(!_joinTab)" class="tab @(!_joinTab ? "tab--on" : "")" @onclick="() => _joinTab = false">Create room</button>
+            <button type="button" role="tab" aria-selected="@_joinTab" class="tab @(_joinTab ? "tab--on" : "")" @onclick="() => _joinTab = true">Join with code</button>
+        </div>
+
+        @if (!_joinTab)
+        {
+            <p class="muted">Get a private room code and share it with one opponent.</p>
+            <button type="button" class="btn btn--primary btn--lg btn--block" disabled="@_busy" @onclick="CreateAsync">
+                @if (_busy)
+                {
+                    <span class="spinner"></span><span>Creating room…</span>
+                }
+                else
+                {
+                    <span>Create private room</span>
+                }
+            </button>
+        }
+        else
+        {
+            <label class="field">
+                <span>Room code</span>
+                <input class="code-input" @bind="_code" @bind:event="oninput" maxlength="@RoomCode.Length" placeholder="ABC234" autocapitalize="characters" autocomplete="off" spellcheck="false" @onkeydown="JoinOnEnter" />
+            </label>
+            <button type="button" class="btn btn--primary btn--lg btn--block" disabled="@_busy" @onclick="JoinAsync">
+                @if (_busy)
+                {
+                    <span class="spinner"></span><span>Joining…</span>
+                }
+                else
+                {
+                    <span>Join duel</span>
+                }
+            </button>
+        }
+
+        @if (_error is not null)
+        {
+            <p class="form-error" role="alert">@_error</p>
+        }
+
+        @if (Duel.Session is { } session && Duel.View is not null)
+        {
+            <a class="btn btn--ghost btn--block" href="@($"room/{session.RoomCode}")">Return to room @session.RoomCode</a>
+        }
+
+        <div class="play-card__alt">
+            <a class="btn btn--text" href="practice">Practice solo</a>
+            <a class="btn btn--text" href="how-to-play">How to play</a>
+        </div>
+    </div>
+
+    <div class="features">
+        <article class="feature">
+            <Icon Name="eye-off" Size="28" />
+            <h3>Blind Duel</h3>
+            <p>Your opponent's words stay hidden. You only see their attempt count and when they finish.</p>
+        </article>
+        <article class="feature">
+            <Icon Name="trophy" Size="28" />
+            <h3>Best of three</h3>
+            <p>Fewer guesses wins the round; ties go to the faster solve, timed by the server.</p>
+        </article>
+        <article class="feature">
+            <Icon Name="chart" Size="28" />
+            <h3>Strategy analyzer</h3>
+            <p>After each round see how many candidates every guess eliminated — and who narrowed it down faster.</p>
+        </article>
+    </div>
+</section>
+
+@code {
+    private static readonly LetterState[] HeroStates = [LetterState.Correct, LetterState.Present, LetterState.Absent, LetterState.Correct];
+
+    [Parameter] public string? Code { get; set; }
+
+    [CascadingParameter] public UserPreferences Prefs { get; set; } = default!;
+
+    private string _nickname = "";
+    private string _code = "";
+    private bool _joinTab;
+    private bool _busy;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(Code))
+        {
+            _code = Code.ToUpperInvariant();
+            _joinTab = true;
+        }
+        await Prefs.LoadAsync();
+        _nickname = Prefs.Nickname;
+    }
+
+    // The same pure validation functions as the server give instant feedback; the server re-validates anyway.
+    private Task CreateAsync() =>
+        RunAsync(Nickname.Validate(_nickname)
+            .BindAsync(async name => (await Duel.CreateRoomAsync(name)).Map(ticket => (name, ticket))));
+
+    private Task JoinAsync() =>
+        RunAsync(RoomCode.Normalize(_code)
+            .Bind(code => Nickname.Validate(_nickname).Map(name => (code, name)))
+            .BindAsync(async input => (await Duel.JoinRoomAsync(input.code, input.name)).Map(ticket => (input.name, ticket))));
+
+    private async Task RunAsync(Task<Result<(string Name, SessionTicket Ticket)>> operation)
+    {
+        _busy = true;
+        _error = null;
+        var result = await operation;
+        _busy = false;
+
+        switch (result)
+        {
+            case Success<(string Name, SessionTicket Ticket)> ok:
+                await Prefs.RememberNicknameAsync(ok.Value.Name);
+                Navigation.NavigateTo($"room/{ok.Value.Ticket.RoomCode}");
+                break;
+            case Failure<(string Name, SessionTicket Ticket)> failed:
+                _error = failed.Error.Message;
+                Toasts.Show(failed.Error.Message, ToastKind.Error);
+                break;
+        }
+    }
+
+    private Task JoinOnEnter(KeyboardEventArgs e) => e.Key == "Enter" ? JoinAsync() : Task.CompletedTask;
+}

@@ -1,0 +1,49 @@
+@* Match score: round wins as stars, plus a dot per finished round. *@
+<section class="scoreboard" aria-label="Match score">
+    <div class="scoreboard__side">
+        <span class="scoreboard__name">@MyName <small>(you)</small></span>
+        <span class="stars" aria-label="@($"{Score.MyWins} round wins")">
+            @for (var i = 0; i < Score.WinsNeeded; i++)
+            {
+                <i class="@(i < Score.MyWins ? "on" : "")"></i>
+            }
+        </span>
+    </div>
+
+    <div class="scoreboard__center">
+        <div class="scoreboard__score"><b>@Score.MyWins</b><span>:</span><b>@Score.OpponentWins</b></div>
+        <div class="scoreboard__round">@RoundLabel</div>
+        @if (Score.Rounds.Count > 0)
+        {
+            <div class="round-dots" aria-label="Round results">
+                @foreach (var verdict in Score.Rounds)
+                {
+                    <span class="round-dot round-dot--@verdict.ToString().ToLowerInvariant()" title="@verdict"></span>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="scoreboard__side scoreboard__side--right">
+        <span class="scoreboard__name">@OpponentName</span>
+        <span class="stars" aria-label="@($"{Score.OpponentWins} round wins")">
+            @for (var i = 0; i < Score.WinsNeeded; i++)
+            {
+                <i class="@(i < Score.OpponentWins ? "on" : "")"></i>
+            }
+        </span>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public ScoreView Score { get; set; } = default!;
+
+    [Parameter] public string MyName { get; set; } = "";
+
+    [Parameter] public string OpponentName { get; set; } = "";
+
+    [Parameter] public int RoundNumber { get; set; }
+
+    private string RoundLabel =>
+        $"Round {RoundNumber} · Best of {Score.WinsNeeded * 2 - 1}" + (Score.Draws > 0 ? $" · {Score.Draws} draw{(Score.Draws == 1 ? "" : "s")}" : "");
+}

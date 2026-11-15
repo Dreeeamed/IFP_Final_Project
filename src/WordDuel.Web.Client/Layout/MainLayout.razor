@@ -1,0 +1,62 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject UserPreferences Prefs
+@inject BrowserInterop Browser
+
+<div class="app @(Prefs.HighContrast ? "contrast" : "")">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="topbar">
+        <a class="brand" href="" aria-label="Word Duel home">
+            <span class="brand__tiles" aria-hidden="true"><span class="mini g">W</span><span class="mini y">D</span></span>
+            <span class="brand__name">Word Duel <small>Blind Arena</small></span>
+        </a>
+
+        <nav class="topnav" aria-label="Main">
+            <NavLink href="" Match="NavLinkMatch.All">Play</NavLink>
+            <NavLink href="practice">Practice</NavLink>
+            <NavLink href="how-to-play">How to play</NavLink>
+            <NavLink href="history">History</NavLink>
+        </nav>
+
+        <div class="topbar__actions">
+            <ConnectionPill />
+            <button type="button" class="icon-btn" aria-pressed="@Prefs.SoundOn" title="@(Prefs.SoundOn ? "Mute sounds" : "Turn sounds on")" @onclick="Prefs.ToggleSoundAsync">
+                <Icon Name="@(Prefs.SoundOn ? "sound-on" : "sound-off")" />
+            </button>
+            <button type="button" class="icon-btn" aria-pressed="@Prefs.HighContrast" title="Colour-blind friendly colours" @onclick="Prefs.ToggleContrastAsync">
+                <Icon Name="contrast" />
+            </button>
+        </div>
+    </header>
+
+    <main id="main" class="page" tabindex="-1">
+        @* Preferences are shared with every page and component through a cascading value. *@
+        <CascadingValue Value="Prefs" IsFixed="true">
+            @Body
+        </CascadingValue>
+    </main>
+
+    <footer class="footer">
+        <span>Word Duel — Blind Arena · Functional Programming in C# final project</span>
+        <span class="muted">C# · .NET · Blazor WebAssembly · SignalR</span>
+    </footer>
+
+    <ToastHost />
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        Prefs.Changed += OnChanged;
+        await Prefs.LoadAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.RemoveSplashAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Prefs.Changed -= OnChanged;
+}

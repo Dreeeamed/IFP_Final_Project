@@ -1,0 +1,111 @@
+@* Post-round Word Strategy Analyzer. Every number shown here was computed from the real guesses. *@
+<section class="analysis card" aria-labelledby="analysis-title">
+    <header class="analysis__head">
+        <h2 id="analysis-title"><Icon Name="chart" /> Strategy analysis</h2>
+        <p class="muted">Starting from all @PoolSize possible answers, each guess keeps only the words that would have produced the same colours.</p>
+    </header>
+
+    @if (Highlights.Count > 0)
+    {
+        <ul class="highlights">
+            @foreach (var line in Highlights)
+            {
+                <li><Icon Name="bolt" Size="16" /> @line</li>
+            }
+        </ul>
+    }
+
+    <div class="analysis__players @(Opponent is null ? "analysis__players--single" : "")">
+        @foreach (var player in Players)
+        {
+            <article class="strategy">
+                <h3>@player.Nickname</h3>
+                <p class="strategy__summary">
+                    @if (player.Solved)
+                    {
+                        <span class="badge badge--done">Solved in @player.Attempts</span>
+                    }
+                    else
+                    {
+                        <span class="badge badge--fail">Not solved</span>
+                    }
+                    @if (player.SolveSeconds is { } seconds)
+                    {
+                        <span class="muted">@FormatSeconds(seconds)</span>
+                    }
+                    @if (player.Guesses.Count > 0)
+                    {
+                        <span class="muted">avg. @player.AverageElimination.ToString("0")% eliminated per guess</span>
+                    }
+                </p>
+
+                @if (player.Guesses.Count == 0)
+                {
+                    <p class="muted">No guesses this round.</p>
+                }
+                <ol class="steps">
+                    @foreach (var step in player.Guesses)
+                    {
+                        <li class="step">
+                            <div class="step__word">
+                                @for (var i = 0; i < step.Word.Length; i++)
+                                {
+                                    <span class="mini @MiniClass(step.States[i])">@step.Word[i]</span>
+                                }
+                            </div>
+                            <div class="step__numbers">
+                                <span class="step__flow"><b>@step.CandidatesBefore</b> → <b>@step.CandidatesAfter</b></span>
+                                <span class="step__pct">−@step.EliminationPercent.ToString("0.#")%</span>
+                            </div>
+                            <div class="bar" role="img" aria-label="@($"{step.CandidatesAfter} of {step.CandidatesBefore} candidates left")">
+                                <span style="width:@Width(step)%"></span>
+                            </div>
+                            <div class="step__meta">
+                                <span title="Average pool size this guess would leave, before seeing the colours">expected ≈ @step.ExpectedAfter.ToString("0.#")</span>
+                                <span title="How many different colour patterns this guess could produce">@step.PossibleOutcomes outcomes</span>
+                                @if (step.WasPossibleAnswer)
+                                {
+                                    <span class="ok" title="This word was still a possible answer"><Icon Name="check" Size="12" /> could be the answer</span>
+                                }
+                                else
+                                {
+                                    <span class="warn" title="Earlier clues already ruled this word out"><Icon Name="x" Size="12" /> already ruled out</span>
+                                }
+                            </div>
+                            @if (step.CandidatesAfter is > 1 and <= 6)
+                            {
+                                <div class="step__left">left: @string.Join(", ", step.SampleRemaining)</div>
+                            }
+                        </li>
+                    }
+                </ol>
+            </article>
+        }
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public PlayerStrategy Me { get; set; } = default!;
+
+    [Parameter] public PlayerStrategy? Opponent { get; set; }
+
+    [Parameter] public IReadOnlyList<string> Highlights { get; set; } = [];
+
+    [Parameter] public int PoolSize { get; set; }
+
+    private IEnumerable<PlayerStrategy> Players => Opponent is null ? [Me] : [Me, Opponent];
+
+    /// <summary>Bar length uses a log scale so that 1 680 → 40 and 40 → 2 are both visible.</summary>
+    private double Width(GuessInsight step) =>
+        PoolSize <= 1 ? 0 : Math.Round(100 * Math.Log(Math.Max(1, step.CandidatesAfter)) / Math.Log(PoolSize), 1);
+
+    private static string MiniClass(LetterState state) => state switch
+    {
+        LetterState.Correct => "g",
+        LetterState.Present => "y",
+        _ => "x"
+    };
+
+    private static string FormatSeconds(double seconds) =>
+        seconds < 60 ? $"{seconds:0.0}s" : $"{(int)(seconds / 60)}m {seconds % 60:00}s";
+}

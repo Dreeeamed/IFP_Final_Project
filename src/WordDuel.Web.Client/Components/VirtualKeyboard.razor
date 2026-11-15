@@ -1,0 +1,65 @@
+@* On-screen keyboard. Key colours come from the player's OWN feedback only (passed in by the parent). *@
+<div class="keyboard" role="group" aria-label="On-screen keyboard">
+    @foreach (var row in Rows)
+    {
+        <div class="keyboard__row">
+            @foreach (var key in row)
+            {
+                var k = key;
+                <button type="button"
+                        class="@KeyClass(k)"
+                        disabled="@Disabled"
+                        aria-label="@KeyLabel(k)"
+                        @onmousedown:preventDefault="true"
+                        @onclick="() => OnKey.InvokeAsync(k)">
+                    @if (k == "BACK")
+                    {
+                        <Icon Name="backspace" />
+                    }
+                    else
+                    {
+                        @(k == "ENTER" ? "Enter" : k)
+                    }
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly string[][] Rows =
+    [
+        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+        ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+        ["ENTER", "Z", "X", "C", "V", "B", "N", "M", "BACK"]
+    ];
+
+    [Parameter] public IReadOnlyDictionary<char, LetterState> KeyStates { get; set; } = ImmutableDictionary<char, LetterState>.Empty;
+
+    /// <summary>Raised with "A".."Z", "ENTER" or "BACK".</summary>
+    [Parameter] public EventCallback<string> OnKey { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    private string KeyClass(string key)
+    {
+        var wide = key.Length > 1 ? " key--wide" : "";
+        var state = key.Length == 1 && KeyStates.TryGetValue(key[0], out var s)
+            ? s switch
+            {
+                LetterState.Correct => " key--correct",
+                LetterState.Present => " key--present",
+                _ => " key--absent"
+            }
+            : "";
+        return "key" + wide + state;
+    }
+
+    private string KeyLabel(string key) => key switch
+    {
+        "ENTER" => "Submit guess",
+        "BACK" => "Delete letter",
+        _ when KeyStates.TryGetValue(key[0], out var s) => $"{key}, {s.ToString().ToLowerInvariant()}",
+        _ => key
+    };
+}

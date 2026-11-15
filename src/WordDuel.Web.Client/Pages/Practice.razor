@@ -1,0 +1,130 @@
+@page "/practice"
+@implements IAsyncDisposable
+@inject WordDictionary Dictionary
+@inject ToastService Toasts
+@inject BrowserInterop Browser
+
+<PageTitle>Practice — Word Duel</PageTitle>
+
+<section class="practice">
+    <header class="page-head">
+        <p class="eyebrow">Solo practice</p>
+        <h1>Warm up before the duel</h1>
+        <p class="muted">Runs entirely in your browser with the same functional core the server uses. Games played: @_session.GamesPlayed · won: @_session.GamesWon</p>
+    </header>
+
+    <div class="practice__grid">
+        <div class="practice__board">
+            <WordBoard Guesses="Guesses" MaxGuesses="_session.Board.MaxGuesses" CurrentInput="@_input"
+                       ShowInput="!_session.Board.IsFinished" ShakeInput="_shake" RevealRow="_revealRow" />
+
+            @if (_session.Board.IsFinished)
+            {
+                <div class="finished-note">
+                    <b>@(_session.Board.Status == BoardStatus.Solved ? $"Solved in {_session.Board.AttemptsUsed}!" : $"The word was {_session.Secret}.")</b>
+                    <button type="button" class="btn btn--primary" @onclick="NewGame">Play again</button>
+                </div>
+            }
+
+            <VirtualKeyboard KeyStates="KeyboardState.From(_session.Board.Guesses)" OnKey="HandleKeyAsync" Disabled="_session.Board.IsFinished" />
+        </div>
+
+        <div class="practice__side">
+            @if (_analysis is not null)
+            {
+                <StrategyAnalysis Me="_analysis" PoolSize="_session.PoolSize" Highlights="[]" />
+            }
+            else
+            {
+                <div class="card">
+                    <h2>How it works</h2>
+                    <HowToPlay Compact="true" />
+                </div>
+            }
+        </div>
+    </div>
+</section>
+
+@code {
+    [CascadingParameter] public UserPreferences Prefs { get; set; } = default!;
+
+    private PracticeSession _session = default!;
+    private DotNetObjectReference<Practice>? _selfRef;
+    private PlayerStrategy? _analysis;
+    private string _input = "";
+    private bool _shake;
+    private int _revealRow = -1;
+
+    private IReadOnlyList<GuessView> Guesses => BoardView.From(_session.Board).Guesses;
+
+    protected override void OnInitialized() => _session = new PracticeSession(Dictionary);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        await Browser.AttachKeyboardAsync(_selfRef);
+    }
+
+    [JSInvokable]
+    public Task OnPhysicalKey(string key) => HandleKeyAsync(key);
+
+    private async Task HandleKeyAsync(string key)
+    {
+        if (_session.Board.IsFinished) return;
+        switch (key)
+        {
+            case "BACK":
+                if (_input.Length > 0) _input = _input[..^1];
+                break;
+            case "ENTER":
+                await SubmitAsync();
+                break;
+            case { Length: 1 } letter when char.IsAsciiLetter(letter[0]) && _input.Length < WordDictionary.WordLength:
+                _input += letter.ToUpperInvariant();
+                await Prefs.PlayAsync("type");
+                break;
+        }
+        StateHasChanged();
+    }
+
+    private async Task SubmitAsync()
+    {
+        switch (_session.Submit(_input))
+        {
+            case Success<PlayerBoard> ok:
+                _input = "";
+                _revealRow = ok.Value.AttemptsUsed - 1;
+                await Prefs.PlayAsync(ok.Value.Status switch
+                {
+                    BoardStatus.Solved => "win",
+                    BoardStatus.OutOfGuesses => "lose",
+                    _ => "reveal"
+                });
+                if (ok.Value.IsFinished) _analysis = _session.Analyze();
+                break;
+            case Failure<PlayerBoard> failed:
+                Toasts.Show(failed.Error.Message, ToastKind.Error, 1800);
+                await Prefs.PlayAsync("error");
+                _shake = true;
+                StateHasChanged();
+                await Task.Delay(450);
+                _shake = false;
+                break;
+        }
+    }
+
+    private void NewGame()
+    {
+        _session.NewGame();
+        _analysis = null;
+        _input = "";
+        _revealRow = -1;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await Browser.DetachKeyboardAsync();
+        _selfRef?.Dispose();
+    }
+}

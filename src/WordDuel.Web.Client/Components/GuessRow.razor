@@ -1,0 +1,32 @@
+@* A row of five tiles: a submitted guess (with feedback), the word being typed, or an empty row. *@
+<div class="@RowClass" role="group" aria-label="@(Label ?? (Word.Length == 0 ? "empty row" : Word))">
+    @for (var i = 0; i < Length; i++)
+    {
+        var index = i;
+        <WordTile Letter="LetterAt(index)" State="StateAt(index)" Index="index" Animate="Reveal" Small="Small" />
+    }
+</div>
+
+@code {
+    [Parameter] public string Word { get; set; } = "";
+
+    [Parameter] public IReadOnlyList<LetterState>? States { get; set; }
+
+    [Parameter] public int Length { get; set; } = WordDictionary.WordLength;
+
+    [Parameter] public bool Reveal { get; set; }
+
+    [Parameter] public bool Shake { get; set; }
+
+    [Parameter] public bool Celebrate { get; set; }
+
+    [Parameter] public bool Small { get; set; }
+
+    [Parameter] public string? Label { get; set; }
+
+    private string RowClass => "row" + (Shake ? " row--shake" : "") + (Celebrate ? " row--win" : "");
+
+    private char? LetterAt(int index) => index < Word.Length ? Word[index] : null;
+
+    private LetterState? StateAt(int index) => States is not null && index < States.Count ? States[index] : null;
+}

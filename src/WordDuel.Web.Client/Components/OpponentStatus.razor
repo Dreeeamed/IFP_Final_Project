@@ -1,0 +1,50 @@
+@* What a player may know about the opponent during a round: name, connection, attempts, finished. *@
+<section class="card opponent" aria-label="Opponent status">
+    <header class="opponent__head">
+        <span class="avatar" aria-hidden="true">@Initial</span>
+        <div>
+            <div class="opponent__name">@Opponent.Nickname</div>
+            <div class="presence presence--@Opponent.Presence.ToString().ToLowerInvariant()">
+                <span class="presence__dot"></span>@PresenceText
+            </div>
+        </div>
+    </header>
+
+    <div class="pips" role="img" aria-label="@($"{Opponent.AttemptsUsed} of {Opponent.MaxGuesses} attempts used")">
+        @for (var i = 0; i < Opponent.MaxGuesses; i++)
+        {
+            <span class="pip @(i < Opponent.AttemptsUsed ? "pip--used" : "")">
+                @for (var t = 0; t < WordDictionary.WordLength; t++)
+                {
+                    <i></i>
+                }
+            </span>
+        }
+    </div>
+
+    <p class="opponent__state" aria-live="polite">
+        @if (Opponent.Finished)
+        {
+            <span class="badge badge--done"><Icon Name="check" Size="14" /> Finished</span>
+            <span class="muted">in @Opponent.AttemptsUsed attempt@(Opponent.AttemptsUsed == 1 ? "" : "s")</span>
+        }
+        else
+        {
+            <span class="badge badge--live"><span class="dots"><i></i><i></i><i></i></span> Guessing</span>
+            <span class="muted">@Opponent.AttemptsUsed / @Opponent.MaxGuesses attempts</span>
+        }
+    </p>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public OpponentView Opponent { get; set; } = default!;
+
+    private string Initial => Opponent.Nickname.Length > 0 ? Opponent.Nickname[..1].ToUpperInvariant() : "?";
+
+    private string PresenceText => Opponent.Presence switch
+    {
+        Presence.Connected => "Online",
+        Presence.Disconnected => "Reconnecting…",
+        _ => "Left the room"
+    };
+}

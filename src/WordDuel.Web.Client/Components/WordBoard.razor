@@ -1,0 +1,41 @@
+@* A full board: submitted guesses, then the current input row, then empty rows up to MaxGuesses. *@
+<div class="board @(Small ? "board--small" : "")" role="grid" aria-label="@(Label ?? "Your board")">
+    @for (var row = 0; row < MaxGuesses; row++)
+    {
+        var r = row;
+        if (r < Guesses.Count)
+        {
+            var guess = Guesses[r];
+            <GuessRow Word="@guess.Word" States="guess.States" Reveal="r == RevealRow" Celebrate="r == RevealRow && IsCorrect(guess)" Small="Small" />
+        }
+        else if (r == Guesses.Count && ShowInput)
+        {
+            <GuessRow Word="@CurrentInput" Shake="ShakeInput" Small="Small" Label="@($"Current guess: {CurrentInput}")" />
+        }
+        else
+        {
+            <GuessRow Small="Small" />
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<GuessView> Guesses { get; set; } = [];
+
+    [Parameter] public int MaxGuesses { get; set; } = PlayerBoard.DefaultMaxGuesses;
+
+    [Parameter] public string CurrentInput { get; set; } = "";
+
+    [Parameter] public bool ShowInput { get; set; }
+
+    [Parameter] public bool ShakeInput { get; set; }
+
+    /// <summary>Index of the row that was just revealed (animated), or -1.</summary>
+    [Parameter] public int RevealRow { get; set; } = -1;
+
+    [Parameter] public bool Small { get; set; }
+
+    [Parameter] public string? Label { get; set; }
+
+    private static bool IsCorrect(GuessView guess) => guess.States.All(state => state == LetterState.Correct);
+}

@@ -1,0 +1,19 @@
+@implements IDisposable
+@inject ToastService Toasts
+@* Renders the toast state container. Subscribes on init, unsubscribes on dispose. *@
+<div class="toasts" role="status" aria-live="polite">
+    @foreach (var toast in Toasts.Toasts)
+    {
+        <div class="toast toast--@toast.Kind.ToString().ToLowerInvariant()" @key="toast.Id" @onclick="() => Toasts.Dismiss(toast.Id)">
+            @toast.Message
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Toasts.Changed -= OnChanged;
+}

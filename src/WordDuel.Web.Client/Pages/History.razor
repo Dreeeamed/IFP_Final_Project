@@ -1,0 +1,77 @@
+@page "/history"
+@inject HttpClient Http
+
+<PageTitle>Match history — Word Duel</PageTitle>
+
+<section class="history">
+    <header class="page-head">
+        <p class="eyebrow">Hall of fame</p>
+        <h1>Leaderboard & recent matches</h1>
+        <p class="muted">Finished matches are stored in a local SQLite database. Nicknames are not accounts, so players with the same nickname are counted together.</p>
+    </header>
+
+    @if (_loading)
+    {
+        <div class="center-card card"><span class="spinner spinner--lg"></span><p>Loading history…</p></div>
+    }
+    else if (_failed)
+    {
+        <div class="center-card card"><p>Could not load the history right now.</p><button class="btn btn--ghost" @onclick="LoadAsync">Try again</button></div>
+    }
+    else
+    {
+        <div class="history__grid">
+            <div class="card">
+                <h2>Leaderboard</h2>
+                <DataTable Items="_data.Leaderboard" TItem="LeaderboardEntry">
+                    <Header><th>#</th><th>Player</th><th>Wins</th><th>Matches</th><th>Win rate</th></Header>
+                    <Row Context="entry">
+                        <td>@(_data.Leaderboard.ToList().IndexOf(entry) + 1)</td>
+                        <td>@entry.Nickname</td>
+                        <td>@entry.Wins</td>
+                        <td>@entry.Matches</td>
+                        <td>@entry.WinRate.ToString("0")%</td>
+                    </Row>
+                    <Empty>No finished matches yet — be the first!</Empty>
+                </DataTable>
+            </div>
+            <div class="card">
+                <h2>Recent matches</h2>
+                <DataTable Items="_data.Recent" TItem="FinishedMatch">
+                    <Header><th>When</th><th>Players</th><th>Score</th><th>Result</th></Header>
+                    <Row Context="match">
+                        <td>@match.FinishedAtUtc.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                        <td>@match.FirstNickname vs @match.SecondNickname</td>
+                        <td>@match.FirstWins : @match.SecondWins</td>
+                        <td>@(match.WinnerNickname is { } winner ? $"{winner} won" : "Draw")@(match.EndReason == "Forfeit" ? " (forfeit)" : "")</td>
+                    </Row>
+                </DataTable>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private sealed record HistoryResponse(List<FinishedMatch> Recent, List<LeaderboardEntry> Leaderboard);
+
+    private HistoryResponse _data = new([], []);
+    private bool _loading = true;
+    private bool _failed;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _failed = false;
+        try
+        {
+            _data = await Http.GetFromJsonAsync<HistoryResponse>("api/history") ?? new([], []);
+        }
+        catch (Exception)
+        {
+            _failed = true;
+        }
+        _loading = false;
+    }
+}

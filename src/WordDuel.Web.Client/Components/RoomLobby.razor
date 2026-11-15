@@ -1,0 +1,51 @@
+@inject BrowserInterop Browser
+@inject ToastService Toasts
+@inject NavigationManager Navigation
+@* Waiting room shown to the host until an opponent joins. *@
+<section class="lobby card card--glow" aria-labelledby="lobby-title">
+    <p class="eyebrow">Private room</p>
+    <h1 id="lobby-title">Waiting for an opponent</h1>
+    <p class="muted">Share this code (or the invite link) with a friend. The duel starts the moment they join.</p>
+
+    <div class="room-code" aria-label="@($"Room code {string.Join(' ', Code.ToCharArray())}")">
+        @for (var i = 0; i < Code.Length; i++)
+        {
+            <WordTile Letter="Code[i]" State="LetterState.Correct" Index="i" />
+        }
+    </div>
+
+    <div class="lobby__actions">
+        <button type="button" class="btn btn--primary" @onclick="CopyCode"><Icon Name="copy" /> Copy code</button>
+        <button type="button" class="btn btn--ghost" @onclick="CopyLink"><Icon Name="link" /> Copy invite link</button>
+    </div>
+
+    <div class="waiting" aria-live="polite">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span>@Nickname is waiting…</span>
+    </div>
+
+    <ul class="lobby__rules">
+        <li><b>Best of @(WinsNeeded * 2 - 1)</b> — first to @WinsNeeded round wins.</li>
+        <li><b>Blind Duel</b> — you only see your opponent's attempt count until the round ends.</li>
+        <li><b>Tie-breaks</b> — fewer guesses, then the faster server-measured time.</li>
+    </ul>
+
+    <button type="button" class="btn btn--text" @onclick="OnLeave"><Icon Name="arrow-left" /> Cancel and leave</button>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Code { get; set; } = "";
+
+    [Parameter] public string Nickname { get; set; } = "";
+
+    [Parameter] public int WinsNeeded { get; set; } = 2;
+
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    private async Task CopyCode() => Report(await Browser.CopyAsync(Code), "Room code copied");
+
+    private async Task CopyLink() => Report(await Browser.CopyAsync(Navigation.ToAbsoluteUri($"join/{Code}").ToString()), "Invite link copied");
+
+    private void Report(bool copied, string message) =>
+        Toasts.Show(copied ? message : "Copy failed — select the code manually", copied ? ToastKind.Success : ToastKind.Error);
+}

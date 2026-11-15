@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Imperative shell services: room registry, player sessions, secure randomness,
+    clock, orchestration of the functional core and match-history persistence.
+    It does not reference SignalR; the web host plugs in an IRoomNotifier.
+  -->
+  <PropertyGroup>
+    <RootNamespace>WordDuel.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WordDuel.Core\WordDuel.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.15" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.15" />
+  </ItemGroup>
+
+</Project>

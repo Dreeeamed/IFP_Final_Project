@@ -1,0 +1,91 @@
+@* Final match screen with statistics and the rematch vote. *@
+<section class="match-result card card--glow verdict--@Result.Verdict.ToString().ToLowerInvariant()" aria-labelledby="match-title">
+    <div class="trophy" aria-hidden="true"><Icon Name="trophy" Size="44" /></div>
+    <p class="eyebrow">Match over</p>
+    <h1 id="match-title">@Headline</h1>
+    <p class="muted">@Subtitle</p>
+
+    <div class="final-score">
+        <div><span>@View.Me.Nickname</span><b>@View.Score.MyWins</b></div>
+        <span class="final-score__sep">:</span>
+        <div><b>@View.Score.OpponentWins</b><span>@OpponentName</span></div>
+    </div>
+
+    <table class="stats">
+        <thead>
+            <tr><th scope="col">Statistic</th><th scope="col">You</th><th scope="col">@OpponentName</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var (label, mine, theirs) in Rows)
+            {
+                <tr><th scope="row">@label</th><td>@mine</td><td>@theirs</td></tr>
+            }
+        </tbody>
+    </table>
+
+    <div class="match-result__actions">
+        @if (View.RematchAvailable)
+        {
+            <button type="button" class="btn btn--primary btn--lg" disabled="@(View.MeVotedRematch || Busy)" @onclick="OnRematch">
+                <Icon Name="refresh" /> @(View.MeVotedRematch ? "Waiting for opponent…" : "Rematch")
+            </button>
+            @if (View.OpponentVotedRematch && !View.MeVotedRematch)
+            {
+                <p class="pulse-text">@OpponentName wants a rematch!</p>
+            }
+        }
+        else
+        {
+            <p class="muted">Rematch unavailable — your opponent has left.</p>
+        }
+        <button type="button" class="btn btn--ghost" @onclick="OnLeave"><Icon Name="arrow-left" /> Back to menu</button>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public PlayerView View { get; set; } = default!;
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter] public EventCallback OnRematch { get; set; }
+
+    [Parameter] public EventCallback OnLeave { get; set; }
+
+    private MatchResultView Result => View.Match!;
+
+    private string OpponentName => View.Opponent?.Nickname ?? "Opponent";
+
+    private string Headline => Result.Verdict switch
+    {
+        Verdict.Won => "Victory!",
+        Verdict.Lost => $"{OpponentName} wins the match",
+        _ => "The match is a draw"
+    };
+
+    private string Subtitle => Result.Reason switch
+    {
+        MatchEndReason.Forfeit when Result.Verdict == Verdict.Won => "Your opponent left the match.",
+        MatchEndReason.Forfeit => "You left the match.",
+        MatchEndReason.RoundLimit => $"Round limit reached after {View.Score.Rounds.Count} rounds.",
+        null => $"Round limit reached with equal wins after {View.Score.Rounds.Count} rounds.",
+        _ => $"First to {View.Score.WinsNeeded} round wins."
+    };
+
+    private IEnumerable<(string Label, string Mine, string Theirs)> Rows
+    {
+        get
+        {
+            var me = Result.MyStats;
+            var them = Result.OpponentStats;
+            yield return ("Rounds won", me.RoundsWon.ToString(), them.RoundsWon.ToString());
+            yield return ("Words solved", me.RoundsSolved.ToString(), them.RoundsSolved.ToString());
+            yield return ("Total guesses", me.TotalGuesses.ToString(), them.TotalGuesses.ToString());
+            yield return ("Avg. guesses (solved)", Avg(me.AverageGuessesWhenSolved), Avg(them.AverageGuessesWhenSolved));
+            yield return ("Fastest solve", Secs(me.FastestSolveSeconds), Secs(them.FastestSolveSeconds));
+        }
+    }
+
+    private static string Avg(double value) => value == 0 ? "—" : value.ToString("0.0");
+
+    private static string Secs(double? seconds) => seconds is { } s ? $"{s:0.0}s" : "—";
+}

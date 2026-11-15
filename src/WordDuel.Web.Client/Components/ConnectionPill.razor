@@ -1,0 +1,25 @@
+@implements IDisposable
+@inject DuelConnection Duel
+@* Shows the SignalR link state while a duel session exists. *@
+@if (Duel.Session is not null)
+{
+    <span class="pill pill--@Duel.Status.ToString().ToLowerInvariant()" role="status" title="Connection to the game server">
+        <span class="pill__dot"></span>@Text
+    </span>
+}
+
+@code {
+    private string Text => Duel.Status switch
+    {
+        LinkStatus.Online => "Live",
+        LinkStatus.Connecting => "Connecting",
+        LinkStatus.Reconnecting => "Reconnecting",
+        _ => "Offline"
+    };
+
+    protected override void OnInitialized() => Duel.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Duel.Changed -= OnChanged;
+}

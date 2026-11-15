@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0d1117" />
+    <meta name="description" content="Word Duel — Blind Arena: a real-time, two-player word-guessing duel." />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <ImportMap />
+    <title>Word Duel — Blind Arena</title>
+    <HeadOutlet @rendermode="ClientOnly" />
+</head>
+
+<body>
+    @* Shown until the WebAssembly runtime has started; the layout removes it on first render. *@
+    <div id="boot-splash" aria-live="polite">
+        <div class="boot-logo">
+            <span class="tile-mini g">W</span><span class="tile-mini y">D</span>
+        </div>
+        <p>Loading Word Duel…</p>
+    </div>
+    <Routes @rendermode="ClientOnly" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["js/wordduel.js"]"></script>
+</body>
+
+</html>
+
+@code {
+    // The UI runs only in the browser (WebAssembly). Prerendering is disabled because the page
+    // immediately opens a SignalR connection, which must happen client-side.
+    private static readonly IComponentRenderMode ClientOnly = new InteractiveWebAssemblyRenderMode(prerender: false);
+}

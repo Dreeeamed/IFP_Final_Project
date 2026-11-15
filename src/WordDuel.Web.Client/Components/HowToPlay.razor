@@ -1,0 +1,50 @@
+@* Rules explained with real tiles. Reused on the home page and the rules page. *@
+<div class="how">
+    <section>
+        <h3>Guess the word in 6 tries</h3>
+        <p>Type any valid five-letter word and press Enter. The tiles change colour to show how close you were.</p>
+        <div class="example">
+            <GuessRow Word="CRANE" States="Example1" />
+            <p><b class="c-correct">C</b> is in the word and in the correct spot.</p>
+        </div>
+        <div class="example">
+            <GuessRow Word="SLOTH" States="Example2" />
+            <p><b class="c-present">O</b> is in the word but in the wrong spot.</p>
+        </div>
+        <div class="example">
+            <GuessRow Word="EERIE" States="Example3" />
+            <p>Repeated letters: only as many tiles light up as the secret actually contains.</p>
+        </div>
+    </section>
+
+    @if (!Compact)
+    {
+        <section>
+            <h3>Blind Duel</h3>
+            <p>You and your opponent chase the <b>same</b> secret word on separate boards. While the round is running you only see how many attempts they used and whether they are done — never their words or colours. Both boards are revealed when the round ends.</p>
+        </section>
+        <section>
+            <h3>Winning a round</h3>
+            <ol>
+                <li>If only one player finds the word, they win.</li>
+                <li>If both do, fewer guesses wins.</li>
+                <li>Same number of guesses? The faster solve wins (measured by the server).</li>
+                <li>Nobody solves it → draw. Draws score nothing.</li>
+            </ol>
+            <p>Matches are <b>best of 3</b>: the first to two round wins takes the match. Draws add rounds, up to five in total. Each round has a five-minute limit.</p>
+        </section>
+        <section>
+            <h3>Strategy analyzer</h3>
+            <p>After every round the analyzer replays your guesses against every possible answer and shows how many candidates each guess eliminated, how good the guess was expected to be, and where you or your opponent got lucky.</p>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public bool Compact { get; set; }
+
+    // The examples are produced by the real evaluator, so the rules page can never disagree with the game.
+    private static readonly IReadOnlyList<LetterState> Example1 = WordleEvaluator.Evaluate("CLOUD", "CRANE");
+    private static readonly IReadOnlyList<LetterState> Example2 = WordleEvaluator.Evaluate("ROBIN", "SLOTH");
+    private static readonly IReadOnlyList<LetterState> Example3 = WordleEvaluator.Evaluate("CRANE", "EERIE");
+}

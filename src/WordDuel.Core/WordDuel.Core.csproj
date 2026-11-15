@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Functional core: game rules, state transitions, scoring and analysis.
+    It deliberately references no ASP.NET Core, Blazor, SignalR or database package,
+    so the same code runs on the server (authoritative rules) and in the browser (practice mode).
+  -->
+  <PropertyGroup>
+    <RootNamespace>WordDuel.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\answers.txt" LogicalName="WordDuel.Core.Data.answers.txt" />
+    <EmbeddedResource Include="Data\allowed.txt" LogicalName="WordDuel.Core.Data.allowed.txt" />
+  </ItemGroup>
+
+</Project>

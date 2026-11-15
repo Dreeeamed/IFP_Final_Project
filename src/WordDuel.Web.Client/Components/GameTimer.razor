@@ -1,0 +1,49 @@
+@implements IDisposable
+@* Countdown to a server deadline. The parent passes the clock as a function (Now), so the timer
+   uses the server-synchronised time and stays testable — a function as a component parameter. *@
+<div class="timer @(Urgent ? "timer--urgent" : "") @(Compact ? "timer--compact" : "")" role="timer" aria-label="@($"{Label}: {Text}")">
+    <Icon Name="clock" Size="18" />
+    <span class="timer__label">@Label</span>
+    <span class="timer__value">@Text</span>
+</div>
+
+@code {
+    private readonly CancellationTokenSource _stop = new();
+
+    [Parameter, EditorRequired] public DateTimeOffset Until { get; set; }
+
+    [Parameter] public Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.UtcNow;
+
+    [Parameter] public string Label { get; set; } = "Time left";
+
+    [Parameter] public int UrgentSeconds { get; set; } = 30;
+
+    [Parameter] public bool Compact { get; set; }
+
+    private TimeSpan Remaining => TimeSpan.FromTicks(Math.Max(0, (Until - Now()).Ticks));
+
+    private bool Urgent => Remaining.TotalSeconds <= UrgentSeconds;
+
+    private string Text => $"{(int)Remaining.TotalMinutes}:{Remaining.Seconds:00}";
+
+    protected override void OnInitialized() => _ = TickAsync();
+
+    private async Task TickAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_stop.Token))
+                await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    public void Dispose()
+    {
+        _stop.Cancel();
+        _stop.Dispose();
+    }
+}

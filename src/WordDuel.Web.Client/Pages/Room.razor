@@ -1,0 +1,276 @@
+@page "/room/{Code}"
+@implements IAsyncDisposable
+@inject DuelConnection Duel
+@inject NavigationManager Navigation
+@inject ToastService Toasts
+@inject BrowserInterop Browser
+
+<PageTitle>Room @Code.ToUpperInvariant() — Word Duel</PageTitle>
+
+@if (_loading)
+{
+    <div class="center-card card"><span class="spinner spinner--lg"></span><p>Connecting to room @Code.ToUpperInvariant()…</p></div>
+}
+else if (_fatal is not null)
+{
+    <div class="center-card card">
+        <Icon Name="wifi-off" Size="36" />
+        <h1>Can't open this room</h1>
+        <p class="muted">@_fatal.Message</p>
+        <div class="row-actions">
+            <a class="btn btn--primary" href="@($"join/{Code.ToUpperInvariant()}")">Join with this code</a>
+            <a class="btn btn--ghost" href="">Back to menu</a>
+        </div>
+    </div>
+}
+else if (Duel.View is { } view)
+{
+    @if (Duel.SessionError is { } lost)
+    {
+        <div class="banner banner--error" role="alert">@lost.Message <a href="">Back to menu</a></div>
+    }
+    else if (Duel.Status is LinkStatus.Reconnecting or LinkStatus.Offline)
+    {
+        <div class="banner banner--warn" role="alert"><span class="spinner"></span> Connection lost — reconnecting. Your seat is kept for a minute.</div>
+    }
+    @if (view.Opponent is { Presence: Presence.Disconnected } away && view.Phase != MatchPhase.MatchOver)
+    {
+        <div class="banner banner--warn" role="status">@away.Nickname lost connection. If they don't return within a minute, you win by forfeit.</div>
+    }
+
+    @switch (view.Phase)
+    {
+        case MatchPhase.WaitingForOpponent:
+            <RoomLobby Code="@view.RoomCode" Nickname="@view.Me.Nickname" WinsNeeded="view.Score.WinsNeeded" OnLeave="LeaveNowAsync" />
+            break;
+
+        case MatchPhase.Playing when view.Me.Board is { } board && view.Opponent is { } opponent:
+            <div class="duel">
+                <MatchScoreboard Score="view.Score" MyName="@view.Me.Nickname" OpponentName="@opponent.Nickname" RoundNumber="view.RoundNumber" />
+                <div class="duel__grid">
+                    <section class="duel__main" aria-label="Your board">
+                        <WordBoard Guesses="board.Guesses" MaxGuesses="board.MaxGuesses" CurrentInput="@_input"
+                                   ShowInput="board.Status == BoardStatus.InProgress" ShakeInput="_shake" RevealRow="_revealRow" />
+                        @if (board.Status != BoardStatus.InProgress)
+                        {
+                            <div class="finished-note" aria-live="polite">
+                                <b>@(board.Status == BoardStatus.Solved ? $"Solved in {board.Guesses.Count}! 🎉" : "Out of guesses.")</b>
+                                <span>Waiting for @opponent.Nickname to finish — the word and both boards are revealed when the round ends.</span>
+                            </div>
+                        }
+                        <VirtualKeyboard KeyStates="KeyStates(board)" OnKey="HandleKeyAsync" Disabled="@(board.Status != BoardStatus.InProgress)" />
+                        <button type="button" class="btn btn--text mobile-only" @onclick="() => _confirmLeave = true">Leave match</button>
+                    </section>
+                    <aside class="duel__side">
+                        @if (view.RoundDeadline is { } deadline)
+                        {
+                            <GameTimer Until="deadline" Now="ServerNow" Label="Round ends in" />
+                        }
+                        <OpponentStatus Opponent="opponent" />
+                        <div class="card blind-note">
+                            <Icon Name="eye-off" />
+                            <p><b>Blind Duel.</b> You can't see @opponent.Nickname's words or colours — and they can't see yours — until the round ends.</p>
+                        </div>
+                        <button type="button" class="btn btn--text desktop-only" @onclick="() => _confirmLeave = true">Leave match</button>
+                    </aside>
+                </div>
+            </div>
+            break;
+
+        case MatchPhase.RoundOver when view.LastRound is { } reveal:
+            <MatchScoreboard Score="view.Score" MyName="@view.Me.Nickname" OpponentName="@(view.Opponent?.Nickname ?? "")" RoundNumber="view.RoundNumber" />
+            <RoundResult Reveal="reveal" ShowNextRoundControls="true" NextRoundAt="view.NextRoundAt" MeReady="view.MeReady"
+                         OpponentReady="view.OpponentReady" Busy="_busy" Now="ServerNow" OnReady="ReadyAsync" />
+            <div class="center-actions"><button type="button" class="btn btn--text" @onclick="() => _confirmLeave = true">Leave match</button></div>
+            break;
+
+        case MatchPhase.MatchOver:
+            <MatchResult View="view" Busy="_busy" OnRematch="RematchAsync" OnLeave="LeaveNowAsync" />
+            @if (view.LastRound is { } last)
+            {
+                <details class="last-round">
+                    <summary>Show the final round (round @last.Number, word @last.Secret)</summary>
+                    <RoundResult Reveal="last" />
+                </details>
+            }
+            break;
+    }
+}
+
+<Modal Open="_confirmLeave" OnClose="() => _confirmLeave = false">
+    <Title>Leave the match?</Title>
+    <ChildContent><p>Leaving now counts as a forfeit: your opponent wins the match.</p></ChildContent>
+    <Footer>
+        <button type="button" class="btn btn--ghost" @onclick="() => _confirmLeave = false">Stay</button>
+        <button type="button" class="btn btn--danger" @onclick="LeaveNowAsync">Leave and forfeit</button>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter] public string Code { get; set; } = "";
+
+    [CascadingParameter] public UserPreferences Prefs { get; set; } = default!;
+
+    private DotNetObjectReference<Room>? _selfRef;
+    private bool _loading = true;
+    private GameError? _fatal;
+    private string _input = "";
+    private bool _shake;
+    private bool _busy;
+    private bool _confirmLeave;
+    private int _revealRow = -1;
+    private MatchPhase? _lastPhase;
+    private int _lastRound;
+
+    private Func<DateTimeOffset> ServerNow => () => Duel.ServerNow;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Duel.Changed += OnDuelChanged;
+        var code = Code.ToUpperInvariant();
+
+        if (Duel.View?.RoomCode != code)
+        {
+            // A refresh or a new tab: re-claim the seat with the token stored for this tab.
+            var resumed = await Duel.ResumeAsync(code);
+            if (resumed is Failure<SessionTicket> failed)
+            {
+                if (failed.Error.Code == ErrorCode.InvalidToken)
+                {
+                    Navigation.NavigateTo($"join/{code}", replace: true); // not a player here yet → join screen
+                    return;
+                }
+                _fatal = failed.Error;
+            }
+        }
+
+        Remember(Duel.View);
+        _loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _selfRef = DotNetObjectReference.Create(this);
+        await Browser.AttachKeyboardAsync(_selfRef);
+    }
+
+    /// <summary>Called from JavaScript for physical key presses.</summary>
+    [JSInvokable]
+    public Task OnPhysicalKey(string key) => HandleKeyAsync(key);
+
+    private async Task HandleKeyAsync(string key)
+    {
+        if (Duel.View is not { Phase: MatchPhase.Playing, Me.Board: { Status: BoardStatus.InProgress } } || _busy) return;
+
+        switch (key)
+        {
+            case "BACK":
+                if (_input.Length > 0) _input = _input[..^1];
+                break;
+            case "ENTER":
+                await SubmitAsync();
+                break;
+            case { Length: 1 } letter when char.IsAsciiLetter(letter[0]) && _input.Length < WordDictionary.WordLength:
+                _input += letter.ToUpperInvariant();
+                await Prefs.PlayAsync("type");
+                break;
+        }
+        StateHasChanged();
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (_input.Length < WordDictionary.WordLength)
+        {
+            await RejectAsync("Not enough letters");
+            return;
+        }
+
+        _busy = true;
+        var result = await Duel.SubmitGuessAsync(_input);
+        _busy = false;
+
+        switch (result)
+        {
+            case Success<PlayerView> ok:
+                _input = "";
+                _revealRow = (ok.Value.Me.Board?.Guesses.Count ?? 0) - 1;
+                await Prefs.PlayAsync("reveal");
+                break;
+            case Failure<PlayerView> failed:
+                await RejectAsync(failed.Error.Message);
+                break;
+        }
+    }
+
+    private async Task RejectAsync(string message)
+    {
+        Toasts.Show(message, ToastKind.Error, 1800);
+        await Prefs.PlayAsync("error");
+        await Browser.VibrateAsync(60);
+        _shake = true;
+        StateHasChanged();
+        await Task.Delay(450);
+        _shake = false;
+        StateHasChanged();
+    }
+
+    private Task ReadyAsync() => RunAsync(Duel.ReadyAsync);
+
+    private Task RematchAsync() => RunAsync(Duel.RematchAsync);
+
+    private async Task RunAsync(Func<Task<Result<PlayerView>>> action)
+    {
+        _busy = true;
+        (await action()).OnFailure(error => Toasts.Show(error.Message, ToastKind.Error));
+        _busy = false;
+    }
+
+    private async Task LeaveNowAsync()
+    {
+        _confirmLeave = false;
+        await Duel.LeaveAsync();
+        Navigation.NavigateTo("");
+    }
+
+    /// <summary>Reacts to every new server snapshot: sounds and resetting the input between rounds.</summary>
+    private void OnDuelChanged() => InvokeAsync(async () =>
+    {
+        var view = Duel.View;
+        if (view is not null && _lastPhase is { } previous)
+        {
+            if (previous == MatchPhase.WaitingForOpponent && view.Phase == MatchPhase.Playing)
+            {
+                await Prefs.PlayAsync("join");
+                Toasts.Show($"{view.Opponent?.Nickname} joined — go!", ToastKind.Success);
+            }
+            if (previous == MatchPhase.Playing && view.Phase is MatchPhase.RoundOver or MatchPhase.MatchOver)
+                await Prefs.PlayAsync(view.LastRound?.Verdict == Verdict.Won ? "win" : "lose");
+        }
+        Remember(view);
+        StateHasChanged();
+    });
+
+    private void Remember(PlayerView? view)
+    {
+        if (view is null) return;
+        if (view.Phase == MatchPhase.Playing && view.RoundNumber != _lastRound)
+        {
+            _input = "";
+            _revealRow = -1;
+        }
+        _lastPhase = view.Phase;
+        _lastRound = view.Phase == MatchPhase.Playing ? view.RoundNumber : _lastRound;
+    }
+
+    private static IReadOnlyDictionary<char, LetterState> KeyStates(BoardView board) =>
+        KeyboardState.From(board.Guesses.Select(guess => new GuessResult(guess.Word, guess.States.ToImmutableArray())));
+
+    public async ValueTask DisposeAsync()
+    {
+        Duel.Changed -= OnDuelChanged;
+        await Browser.DetachKeyboardAsync();
+        _selfRef?.Dispose();
+    }
+}

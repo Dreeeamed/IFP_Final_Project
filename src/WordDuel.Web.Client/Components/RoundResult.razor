@@ -1,0 +1,79 @@
+@* Round result + reveal: the secret word and BOTH boards become visible only here. *@
+<section class="round-result" aria-labelledby="round-title">
+    <header class="verdict verdict--@Reveal.Verdict.ToString().ToLowerInvariant()">
+        <p class="eyebrow">Round @Reveal.Number@(Reveal.EndReason == RoundEndReason.TimeExpired ? " · time ran out" : "")</p>
+        <h1 id="round-title">@Headline</h1>
+        <p class="verdict__why">@Reveal.Explanation</p>
+    </header>
+
+    <div class="secret" aria-label="@($"The word was {Reveal.Secret}")">
+        <span class="secret__label">The word was</span>
+        <GuessRow Word="@Reveal.Secret" States="AllCorrect" Reveal="true" />
+    </div>
+
+    <div class="reveal-boards">
+        @foreach (var side in new[] { (Player: Reveal.Me, You: true), (Player: Reveal.Opponent, You: false) })
+        {
+            <article class="reveal-board card">
+                <h3>@side.Player.Nickname @(side.You ? "(you)" : "")</h3>
+                <p class="muted">
+                    @(side.Player.Solved ? $"Solved in {side.Player.Attempts}" : $"Not solved · {side.Player.Attempts} attempts")
+                    @if (side.Player.SolveSeconds is { } seconds)
+                    {
+                        <span> · @seconds.ToString("0.0")s</span>
+                    }
+                </p>
+                <WordBoard Guesses="side.Player.Board.Guesses" MaxGuesses="side.Player.Board.MaxGuesses" Small="true" Label="@($"{side.Player.Nickname}'s board")" />
+            </article>
+        }
+    </div>
+
+    @if (ShowNextRoundControls)
+    {
+        <div class="next-round card">
+            @if (NextRoundAt is { } next)
+            {
+                <GameTimer Until="next" Now="Now" Label="Next round in" UrgentSeconds="5" Compact="true" />
+            }
+            <div class="next-round__status">
+                <span class="@(MeReady ? "ready ready--on" : "ready")">You @(MeReady ? "are ready" : "")</span>
+                <span class="@(OpponentReady ? "ready ready--on" : "ready")">@Reveal.Opponent.Nickname @(OpponentReady ? "is ready" : "")</span>
+            </div>
+            <button type="button" class="btn btn--primary btn--lg" disabled="@(MeReady || Busy)" @onclick="OnReady">
+                @(MeReady ? "Waiting for opponent…" : "Ready for next round")
+            </button>
+        </div>
+    }
+
+    @if (Reveal.Analysis is { } analysis)
+    {
+        <StrategyAnalysis Me="analysis.Me" Opponent="analysis.Opponent" Highlights="analysis.Highlights" PoolSize="analysis.PoolSize" />
+    }
+</section>
+
+@code {
+    private static readonly IReadOnlyList<LetterState> AllCorrect = Enumerable.Repeat(LetterState.Correct, WordDictionary.WordLength).ToArray();
+
+    [Parameter, EditorRequired] public RoundRevealView Reveal { get; set; } = default!;
+
+    [Parameter] public bool ShowNextRoundControls { get; set; }
+
+    [Parameter] public DateTimeOffset? NextRoundAt { get; set; }
+
+    [Parameter] public bool MeReady { get; set; }
+
+    [Parameter] public bool OpponentReady { get; set; }
+
+    [Parameter] public bool Busy { get; set; }
+
+    [Parameter] public Func<DateTimeOffset> Now { get; set; } = () => DateTimeOffset.UtcNow;
+
+    [Parameter] public EventCallback OnReady { get; set; }
+
+    private string Headline => Reveal.Verdict switch
+    {
+        Verdict.Won => "You won the round!",
+        Verdict.Lost => $"{Reveal.Opponent.Nickname} won the round",
+        _ => "It's a draw"
+    };
+}
